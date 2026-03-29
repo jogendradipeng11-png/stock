@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StoreVault • Inventory Management</title>
+ 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+ 
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .heading-font { font-family: 'Space Grotesk', sans-serif; }
+        .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
+        .low-stock { background-color: #7f1d1d !important; color: #fca5a5; }
+        .high-stock { background-color: #1e3a8a !important; color: #93c5fd; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[10000]">
+        <div class="glass w-full max-w-md mx-4 rounded-3xl p-10 text-center">
+            <h1 class="heading-font text-4xl mb-2">StoreVault</h1>
+            <p class="text-cyan-400 mb-8">Inventory Management</p>
+            <input id="username" placeholder="Username" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-4">
+            <input id="password" type="password" placeholder="Password" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-6">
+            <button onclick="attemptLogin()" class="w-full h-12 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-3xl">LOGIN</button>
+            <p class="text-xs text-slate-400 mt-6">Demo: admin / 1234</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" style="display: none;">
+        <nav class="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
+            <div class="max-w-screen-2xl mx-auto px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-9 h-9 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center">
+                        <i class="fa-solid fa-boxes-stacked text-white text-2xl"></i>
+                    </div>
+                    <h1 class="heading-font text-3xl">StoreVault</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="exportCSV()" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-5 h-10 rounded-3xl">
+                        <i class="fa-solid fa-download"></i> Export Inventory
+                    </button>
+                    <button onclick="exportTransactionsCSV()" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-5 h-10 rounded-3xl">
+                        <i class="fa-solid fa-download"></i> Export Transactions
+                    </button>
+                    <button onclick="importCSV()" class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 px-5 h-10 rounded-3xl">
+                        <i class="fa-solid fa-upload"></i> Import CSV
+                    </button>
+                    
+                    <button onclick="manualSaveToGoogle()" 
+                            class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 h-10 rounded-3xl font-medium">
+                        <i class="fa-solid fa-cloud-upload-alt"></i> 
+                        Save to Google Sheet
+                    </button>
+
+                    <button onclick="openNewEntryModal()" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-semibold px-6 h-11 rounded-3xl flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> NEW ENTRY
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-screen-2xl mx-auto px-8 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-5xl heading-font">Store Inventory</h2>
+                <input id="search-input" type="text" placeholder="Search by Material No, SAP No or Name..."
+                       class="w-96 px-5 py-3 bg-slate-900 border border-white/10 rounded-3xl focus:border-cyan-400 outline-none"
+                       onkeyup="filterTable()">
+            </div>
+
+            <div class="glass rounded-3xl overflow-hidden mb-12">
+                <table class="w-full">
+                    <thead class="bg-slate-900">
+                        <tr class="text-xs uppercase">
+                            <th class="px-8 py-5 text-left">Material No</th>
+                            <th class="px-4 py-5 text-left">SAP Number</th>
+                            <th class="px-4 py-5 text-left">Part Name</th>
+                            <th class="px-4 py-5 text-left">Description</th>
+                            <th class="px-4 py-5 text-center">Stock</th>
+                            <th class="px-4 py-5 text-center">Min</th>
+                            <th class="px-4 py-5 text-center">Max</th>
+                            <th class="px-8 py-5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body" class="text-sm"></tbody>
+                </table>
+            </div>
+
+            <div class="glass rounded-3xl overflow-hidden">
+                <div class="px-8 py-5 border-b border-white/10 bg-slate-900/50">
+                    <h3 class="font-semibold text-lg">Stock Transaction History</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-900">
+                            <tr class="text-xs uppercase">
+                                <th class="px-8 py-5 text-left">Date</th>
+                                <th class="px-4 py-5 text-left">Material No</th>
+                                <th class="px-4 py-5 text-left">SAP Number</th>
+                                <th class="px-4 py-5 text-left">Part Name</th>
+                                <th class="px-4 py-5 text-center">IN</th>
+                                <th class="px-4 py-5 text-center">OUT</th>
+                                <th class="px-4 py-5 text-left">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-table-body" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="csv-import" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
+
+    <!-- New Entry Modal -->
+    <div id="new-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
+        <div class="modal glass w-full max-w-lg mx-4 rounded-3xl p-8">
+            <h2 class="text-2xl font-semibold mb-6">New Stock Entry</h2>
+            <select id="part-select" onchange="handlePartSelection()" class="w-full p-4 bg-slate-900 rounded-2xl mb-6"></select>
+         
+            <div id="new-part-section" class="hidden space-y-4 mb-6">
+                <input id="new-part-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl">
+                <input id="sap-number" placeholder="SAP Number (Optional)" class="w-full p-4 bg-slate-900 rounded-2xl">
+                <textarea id="new-part-desc" placeholder="Description" class="w-full p-4 bg-slate-900 rounded-2xl h-24"></textarea>
+                <div class="grid grid-cols-2 gap-4">
+                    <input id="min-stock" type="number" placeholder="Minimum Stock" class="p-4 bg-slate-900 rounded-2xl">
+                    <input id="max-stock" type="number" placeholder="Maximum Stock" class="p-4 bg-slate-900 rounded-2xl">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="text-xs text-emerald-400">QUANTITY IN</label>
+                    <input id="qty-in" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl text-2xl">
+                </div>
+                <div>
+                    <label class="text-xs text-rose-400">QUANTITY OUT</label>
+                    <input id="qty-out" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl text-2xl">
+                </div>
+            </div>
+            <input id="reason-input" placeholder="Reason (Restock, Sale, Damage, Return, etc.)" class="w-full p-4 bg-slate-900 rounded-2xl mb-6">
+            <div class="flex justify-end gap-4">
+                <button onclick="closeModals()" class="px-6 py-3 text-slate-400">Cancel</button>
+                <button onclick="submitNewEntry()" class="bg-cyan-400 text-black px-8 py-3 rounded-3xl font-semibold">SAVE & UPDATE STOCK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
+        <div class="modal glass w-full max-w-lg mx-4 rounded-3xl p-8">
+            <h2 class="text-2xl font-semibold mb-6">Edit Part</h2>
+            <input id="edit-id" type="hidden">
+            <input id="edit-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl mb-4">
+            <textarea id="edit-desc" placeholder="Description" class="w-full p-4 bg-slate-900 rounded-2xl h-24 mb-4"></textarea>
+          
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div>
+                    <label class="text-xs text-slate-400">Current Stock</label>
+                    <input id="edit-stock" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
+                </div>
+                <div>
+                    <label class="text-xs text-emerald-400">Quantity IN</label>
+                    <input id="edit-qty-in" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl">
+                </div>
+                <div>
+                    <label class="text-xs text-rose-400">Quantity OUT</label>
+                    <input id="edit-qty-out" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl">
+                </div>
+            </div>
+            <input id="edit-reason" placeholder="Reason for this adjustment" class="w-full p-4 bg-slate-900 rounded-2xl mb-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs text-slate-400">Min Stock</label>
+                    <input id="edit-min" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400">Max Stock</label>
+                    <input id="edit-max" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-8">
+                <button onclick="closeModals()" class="px-6 py-3 text-slate-400">Cancel</button>
+                <button onclick="saveEditedPart()" class="bg-emerald-400 text-black px-8 py-3 rounded-3xl font-semibold">UPDATE PART</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzM1PCn6kD6UmJkZ8hz9AozA3mLWHign1Enyuc3ZA_be1DePvpGz-V7LW8SDuLxDLQ/exec";
+        
+        let inventory = [];
+        let transactions = [];
+
+        // Manual Save Button
+        async function manualSaveToGoogle() {
+            const btn = event.currentTarget;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Saving...`;
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "save", data: { inventory, transactions } })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert("✅ Successfully Saved to Google Sheet!");
+                } else {
+                    alert("❌ Save Failed!");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("❌ Connection Error!\n\nPlease open this file using Live Server[](http://127.0.0.1)");
+            }
+
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+
+        async function syncToGoogle() {
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "save", data: { inventory, transactions } })
+                });
+            } catch (e) {}
+        }
+
+        async function loadFromGoogle() {
+            try {
+                const res = await fetch(WEB_APP_URL + "?action=get");
+                const result = await res.json();
+                if (result.success) {
+                    inventory = result.inventory || [];
+                    transactions = result.transactions || [];
+                }
+            } catch (e) {
+                console.error("Load Error:", e);
+            }
+        }
+
+        async function attemptLogin() {
+            await loadFromGoogle();
+            document.getElementById('login-modal').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            renderInventory();
+            renderTransactions();
+        }
+
+        function renderInventory(filtered = null) {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            const data = filtered || inventory;
+            data.forEach(item => {
+                const isLow = item.stock < item.minStock;
+                const isHigh = item.stock > item.maxStock;
+                let alertHTML = isLow ? `<span class="text-red-400 text-xs ml-2"><i class="fa-solid fa-triangle-exclamation"></i> Low</span>` :
+                                 isHigh ? `<span class="text-blue-400 text-xs ml-2"><i class="fa-solid fa-circle-exclamation"></i> High</span>` : '';
+                
+                tbody.innerHTML += `
+                <tr class="${isLow ? 'low-stock' : isHigh ? 'high-stock' : ''}">
+                    <td class="px-8 py-5 font-mono">#${item.id}</td>
+                    <td class="px-4 py-5 font-medium">${item.sapNumber || 'NA'}</td>
+                    <td class="px-4 py-5 font-semibold">${item.name}</td>
+                    <td class="px-4 py-5 text-slate-400">${item.description}</td>
+                    <td class="px-4 py-5 text-center font-bold text-xl">${item.stock}${alertHTML}</td>
+                    <td class="px-4 py-5 text-center">${item.minStock}</td>
+                    <td class="px-4 py-5 text-center">${item.maxStock}</td>
+                    <td class="px-8 py-5 text-right">
+                        <button onclick="editPart(${item.id})" class="text-emerald-400 hover:text-white mr-4"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deletePart(${item.id})" class="text-rose-400 hover:text-white"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function renderTransactions() {
+            const tbody = document.getElementById('transactions-table-body');
+            tbody.innerHTML = '';
+            transactions.slice(0, 20).forEach(t => {
+                const item = inventory.find(i => i.id === t.materialId);
+                const sap = item ? (item.sapNumber || 'NA') : 'NA';
+                tbody.innerHTML += `
+                <tr>
+                    <td class="px-8 py-5">${t.date}</td>
+                    <td class="px-4 py-5 font-mono">#${t.materialId}</td>
+                    <td class="px-4 py-5 font-medium">${sap}</td>
+                    <td class="px-4 py-5">${t.partName}</td>
+                    <td class="px-4 py-5 text-center text-emerald-400">${t.qtyIn ? '+' + t.qtyIn : '—'}</td>
+                    <td class="px-4 py-5 text-center text-rose-400">${t.qtyOut ? '-' + t.qtyOut : '—'}</td>
+                    <td class="px-4 py-5 text-slate-400">${t.reason}</td>
+                </tr>`;
+            });
+        }
+
+        function exportCSV() {
+            let csv = "Material No,SAP Number,Part Name,Description,Stock,Min Stock,Max Stock,Last Updated\n";
+            inventory.forEach(i => {
+                csv += `#${i.id},"${i.sapNumber || 'NA'}","${i.name}","${i.description}",${i.stock},${i.minStock},${i.maxStock},"${i.lastUpdated}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `StoreVault_Inventory_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function exportTransactionsCSV() {
+            let csv = "Date,Material No,SAP Number,Part Name,IN,OUT,Reason\n";
+            transactions.forEach(t => {
+                const item = inventory.find(i => i.id === t.materialId);
+                const sap = item ? (item.sapNumber || 'NA') : 'NA';
+                csv += `"${t.date}",#${t.materialId},"${sap}","${t.partName}",${t.qtyIn || 0},${t.qtyOut || 0},"${t.reason}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `StoreVault_Transactions_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        async function handleCSVImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.trim().split('\n');
+                let imported = 0;
+                for (let i = 1; i < rows.length; i++) {
+                    if (!rows[i].trim()) continue;
+                    const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const materialNo = cols[0] ? cols[0].replace(/[^0-9]/g,'') : Date.now() + imported;
+                    const sapNumber = cols[1] ? cols[1].replace(/"/g,'').trim() : "NA";
+                    if (!cols[2]) continue;
+                    inventory.push({
+                        id: parseInt(materialNo) || Date.now() + imported,
+                        sapNumber: sapNumber,
+                        name: cols[2].replace(/"/g,'').trim(),
+                        description: cols[3] ? cols[3].replace(/"/g,'').trim() : "",
+                        stock: parseInt(cols[4]) || 0,
+                        minStock: parseInt(cols[5]) || 20,
+                        maxStock: parseInt(cols[6]) || 500,
+                        lastUpdated: new Date().toISOString().slice(0,10)
+                    });
+                    imported++;
+                }
+                if (imported > 0) {
+                    alert(`✅ Successfully imported ${imported} items!`);
+                    renderInventory();
+                    syncToGoogle();
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function openNewEntryModal() {
+            const select = document.getElementById('part-select');
+            select.innerHTML = `<option value="">— Select Part or Create New —</option>`;
+            inventory.forEach(i => select.innerHTML += `<option value="${i.id}">${i.name}</option>`);
+            select.innerHTML += `<option value="new">+ Create New Part</option>`;
+            document.getElementById('new-part-section').classList.add('hidden');
+            document.getElementById('qty-in').value = 0;
+            document.getElementById('qty-out').value = 0;
+            document.getElementById('reason-input').value = '';
+            document.getElementById('sap-number').value = '';
+            document.getElementById('new-modal').classList.remove('hidden');
+        }
+
+        function handlePartSelection() {
+            const val = document.getElementById('part-select').value;
+            document.getElementById('new-part-section').classList.toggle('hidden', val !== "new");
+        }
+
+        async function submitNewEntry() {
+            const selectValue = document.getElementById('part-select').value;
+            const qtyIn = parseInt(document.getElementById('qty-in').value) || 0;
+            const qtyOut = parseInt(document.getElementById('qty-out').value) || 0;
+            const reason = document.getElementById('reason-input').value.trim() || "Stock Adjustment";
+            if (qtyIn === 0 && qtyOut === 0) {
+                alert("Please enter Quantity IN or OUT");
+                return;
+            }
+            let partId, partName;
+            if (selectValue === "new") {
+                const newName = document.getElementById('new-part-name').value.trim();
+                if (!newName) { alert("Part Name is required!"); return; }
+                let maxId = 0;
+                if (inventory.length > 0) maxId = Math.max(...inventory.map(i => i.id));
+                partId = maxId + 1;
+                partName = newName;
+                inventory.push({
+                    id: partId,
+                    sapNumber: document.getElementById('sap-number').value.trim() || "NA",
+                    name: newName,
+                    description: document.getElementById('new-part-desc').value || "",
+                    stock: qtyIn - qtyOut,
+                    minStock: parseInt(document.getElementById('min-stock').value) || 20,
+                    maxStock: parseInt(document.getElementById('max-stock').value) || 500,
+                    lastUpdated: new Date().toISOString().slice(0,10)
+                });
+            } else {
+                partId = parseInt(selectValue);
+                const item = inventory.find(i => i.id === partId);
+                if (item) {
+                    item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
+                    item.lastUpdated = new Date().toISOString().slice(0,10);
+                    partName = item.name;
+                }
+            }
+            transactions.unshift({
+                date: new Date().toISOString().slice(0,10),
+                materialId: partId,
+                partName: partName || "Unknown",
+                qtyIn: qtyIn,
+                qtyOut: qtyOut,
+                reason: reason
+            });
+            alert("✅ Stock Updated Successfully!");
+            closeModals();
+            renderInventory();
+            renderTransactions();
+            await syncToGoogle();
+        }
+
+        function editPart(id) {
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('edit-name').value = item.name;
+            document.getElementById('edit-desc').value = item.description;
+            document.getElementById('edit-stock').value = item.stock;
+            document.getElementById('edit-min').value = item.minStock;
+            document.getElementById('edit-max').value = item.maxStock;
+            document.getElementById('edit-qty-in').value = 0;
+            document.getElementById('edit-qty-out').value = 0;
+            document.getElementById('edit-reason').value = '';
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        async function saveEditedPart() {
+            const id = parseInt(document.getElementById('edit-id').value);
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+            const qtyIn = parseInt(document.getElementById('edit-qty-in').value) || 0;
+            const qtyOut = parseInt(document.getElementById('edit-qty-out').value) || 0;
+            const reason = document.getElementById('edit-reason').value.trim() || "Stock Edit";
+            item.name = document.getElementById('edit-name').value;
+            item.description = document.getElementById('edit-desc').value;
+            item.minStock = parseInt(document.getElementById('edit-min').value) || 0;
+            item.maxStock = parseInt(document.getElementById('edit-max').value) || 999;
+            if (qtyIn > 0 || qtyOut > 0) {
+                item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
+                item.lastUpdated = new Date().toISOString().slice(0,10);
+                transactions.unshift({
+                    date: new Date().toISOString().slice(0,10),
+                    materialId: item.id,
+                    partName: item.name,
+                    qtyIn: qtyIn,
+                    qtyOut: qtyOut,
+                    reason: reason
+                });
+            }
+            alert("✅ Part Updated Successfully!");
+            closeModals();
+            renderInventory();
+            renderTransactions();
+            await syncToGoogle();
+        }
+
+        async function deletePart(id) {
+            if (confirm("Delete this Material?")) {
+                inventory = inventory.filter(i => i.id !== id);
+                renderInventory();
+                await syncToGoogle();
+            }
+        }
+
+        function closeModals() {
+            document.getElementById('new-modal').classList.add('hidden');
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        function filterTable() {
+            const term = document.getElementById('search-input').value.toLowerCase().trim();
+            if (!term) return renderInventory();
+            const filtered = inventory.filter(item =>
+                item.name.toLowerCase().includes(term) ||
+                item.description.toLowerCase().includes(term) ||
+                String(item.id).includes(term) ||
+                (item.sapNumber && item.sapNumber.toLowerCase().includes(term))
+            );
+            renderInventory(filtered);
+        }
+
+        function importCSV() {
+            document.getElementById('csv-import').click();
+        }
+
+        window.onload = attemptLogin;
+    </script>
+</body>
+</html>
