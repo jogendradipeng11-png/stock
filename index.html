@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StoreVault • Inventory Management</title>
- 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
- 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
         body { font-family: 'Inter', system-ui, sans-serif; }
@@ -15,6 +13,14 @@
         .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
         .low-stock { background-color: #7f1d1d !important; color: #fca5a5; }
         .high-stock { background-color: #1e3a8a !important; color: #93c5fd; }
+        
+        .toast {
+            animation: slideIn 0.3s ease forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen">
@@ -51,12 +57,9 @@
                     <button onclick="importCSV()" class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 px-5 h-10 rounded-3xl">
                         <i class="fa-solid fa-upload"></i> Import CSV
                     </button>
-                    
-                    <button onclick="manualSaveToGoogle()" 
-                            class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 h-10 rounded-3xl font-medium">
+                    <button onclick="manualSaveToGoogle()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 h-10 rounded-3xl font-medium">
                         <i class="fa-solid fa-cloud-upload-alt"></i> Save to Google Sheet
                     </button>
-
                     <button onclick="openNewEntryModal()" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-semibold px-6 h-11 rounded-3xl flex items-center gap-2">
                         <i class="fa-solid fa-plus"></i> NEW ENTRY
                     </button>
@@ -116,12 +119,12 @@
 
     <input type="file" id="csv-import" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
 
-    <!-- New Entry Modal -->
+    <!-- New Entry Modal (unchanged) -->
     <div id="new-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
         <div class="modal glass w-full max-w-lg mx-4 rounded-3xl p-8">
             <h2 class="text-2xl font-semibold mb-6">New Stock Entry</h2>
             <select id="part-select" onchange="handlePartSelection()" class="w-full p-4 bg-slate-900 rounded-2xl mb-6"></select>
-         
+        
             <div id="new-part-section" class="hidden space-y-4 mb-6">
                 <input id="new-part-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl">
                 <input id="sap-number" placeholder="SAP Number (Optional)" class="w-full p-4 bg-slate-900 rounded-2xl">
@@ -131,7 +134,6 @@
                     <input id="max-stock" type="number" placeholder="Maximum Stock" class="p-4 bg-slate-900 rounded-2xl">
                 </div>
             </div>
-
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div>
                     <label class="text-xs text-emerald-400">QUANTITY IN</label>
@@ -150,14 +152,14 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit Modal (unchanged) -->
     <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
         <div class="modal glass w-full max-w-lg mx-4 rounded-3xl p-8">
             <h2 class="text-2xl font-semibold mb-6">Edit Part</h2>
             <input id="edit-id" type="hidden">
             <input id="edit-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl mb-4">
             <textarea id="edit-desc" placeholder="Description" class="w-full p-4 bg-slate-900 rounded-2xl h-24 mb-4"></textarea>
-           
+          
             <div class="grid grid-cols-3 gap-4 mb-6">
                 <div>
                     <label class="text-xs text-slate-400">Current Stock</label>
@@ -191,10 +193,18 @@
     </div>
 
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzM1PCn6kD6UmJkZ8hz9AozA3mLWHign1Enyuc3ZA_be1DePvpGz-V7LW8SDuLxDLQ/exec";
-        
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzpvAJAP8xfPH_WWDapJYEtNQhXi1VMKmUSVJr4rdsB_upqF7l7m-wwsBFGFjuwhG4/exec";
+       
         let inventory = [];
         let transactions = [];
+
+        function showToast(message, type = "success") {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 px-6 py-4 rounded-2xl glass text-sm font-medium toast z-[100000] flex items-center gap-3 ${type === 'error' ? 'border border-red-500' : ''}`;
+            toast.innerHTML = `${type === 'success' ? '✅' : '❌'} ${message}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
 
         async function sendToGoogle(action, payload) {
             try {
@@ -206,7 +216,7 @@
                 return await response.json();
             } catch (err) {
                 console.error("Error:", err);
-                return { success: false };
+                return { success: false, error: err.message };
             }
         }
 
@@ -219,17 +229,13 @@
             const result = await sendToGoogle("save", { inventory, transactions });
 
             if (result.success) {
-                alert("✅ Successfully Saved to Google Sheet!");
+                showToast("✅ Successfully Saved to Google Sheet!");
             } else {
-                alert("❌ Save Failed!\n\nPlease open this file using Live Server or GitHub Pages.");
+                showToast("❌ Save Failed! Make sure your Google Web App is deployed as 'Anyone' and try again.", "error");
             }
 
             btn.innerHTML = originalHTML;
             btn.disabled = false;
-        }
-
-        async function syncToGoogle() {
-            await sendToGoogle("save", { inventory, transactions });
         }
 
         async function loadFromGoogle() {
@@ -253,6 +259,9 @@
             renderTransactions();
         }
 
+        // Keep all your other functions as they are (renderInventory, renderTransactions, submitNewEntry, etc.)
+        // I only replaced alert() with showToast() in the main places for better UX.
+
         function renderInventory(filtered = null) {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = '';
@@ -262,7 +271,7 @@
                 const isHigh = item.stock > item.maxStock;
                 let alertHTML = isLow ? `<span class="text-red-400 text-xs ml-2"><i class="fa-solid fa-triangle-exclamation"></i> Low</span>` :
                                  isHigh ? `<span class="text-blue-400 text-xs ml-2"><i class="fa-solid fa-circle-exclamation"></i> High</span>` : '';
-                
+               
                 tbody.innerHTML += `
                 <tr class="${isLow ? 'low-stock' : isHigh ? 'high-stock' : ''}">
                     <td class="px-8 py-5 font-mono">#${item.id}</td>
@@ -299,191 +308,42 @@
             });
         }
 
-        function exportCSV() {
-            let csv = "Material No,SAP Number,Part Name,Description,Stock,Min Stock,Max Stock,Last Updated\n";
-            inventory.forEach(i => {
-                csv += `#${i.id},"${i.sapNumber || 'NA'}","${i.name}","${i.description}",${i.stock},${i.minStock},${i.maxStock},"${i.lastUpdated}"\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `StoreVault_Inventory_${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-        }
-
-        function exportTransactionsCSV() {
-            let csv = "Date,Material No,SAP Number,Part Name,IN,OUT,Reason\n";
-            transactions.forEach(t => {
-                const item = inventory.find(i => i.id === t.materialId);
-                const sap = item ? (item.sapNumber || 'NA') : 'NA';
-                csv += `"${t.date}",#${t.materialId},"${sap}","${t.partName}",${t.qtyIn || 0},${t.qtyOut || 0},"${t.reason}"\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `StoreVault_Transactions_${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-        }
-
-        async function handleCSVImport(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const rows = text.trim().split('\n');
-                let imported = 0;
-                for (let i = 1; i < rows.length; i++) {
-                    if (!rows[i].trim()) continue;
-                    const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                    const materialNo = cols[0] ? cols[0].replace(/[^0-9]/g,'') : Date.now() + imported;
-                    const sapNumber = cols[1] ? cols[1].replace(/"/g,'').trim() : "NA";
-                    if (!cols[2]) continue;
-                    inventory.push({
-                        id: parseInt(materialNo) || Date.now() + imported,
-                        sapNumber: sapNumber,
-                        name: cols[2].replace(/"/g,'').trim(),
-                        description: cols[3] ? cols[3].replace(/"/g,'').trim() : "",
-                        stock: parseInt(cols[4]) || 0,
-                        minStock: parseInt(cols[5]) || 20,
-                        maxStock: parseInt(cols[6]) || 500,
-                        lastUpdated: new Date().toISOString().slice(0,10)
-                    });
-                    imported++;
-                }
-                if (imported > 0) {
-                    alert(`✅ Successfully imported ${imported} items!`);
-                    renderInventory();
-                    syncToGoogle();
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = '';
-        }
-
-        function openNewEntryModal() {
-            const select = document.getElementById('part-select');
-            select.innerHTML = `<option value="">— Select Part or Create New —</option>`;
-            inventory.forEach(i => select.innerHTML += `<option value="${i.id}">${i.name}</option>`);
-            select.innerHTML += `<option value="new">+ Create New Part</option>`;
-            document.getElementById('new-part-section').classList.add('hidden');
-            document.getElementById('qty-in').value = 0;
-            document.getElementById('qty-out').value = 0;
-            document.getElementById('reason-input').value = '';
-            document.getElementById('sap-number').value = '';
-            document.getElementById('new-modal').classList.remove('hidden');
-        }
-
-        function handlePartSelection() {
-            const val = document.getElementById('part-select').value;
-            document.getElementById('new-part-section').classList.toggle('hidden', val !== "new");
-        }
+        // Replace alert() calls in the following functions with showToast():
 
         async function submitNewEntry() {
-            const selectValue = document.getElementById('part-select').value;
-            const qtyIn = parseInt(document.getElementById('qty-in').value) || 0;
-            const qtyOut = parseInt(document.getElementById('qty-out').value) || 0;
-            const reason = document.getElementById('reason-input').value.trim() || "Stock Adjustment";
+            // ... (your existing code)
             if (qtyIn === 0 && qtyOut === 0) {
-                alert("Please enter Quantity IN or OUT");
+                showToast("Please enter Quantity IN or OUT", "error");
                 return;
             }
-            let partId, partName;
-            if (selectValue === "new") {
-                const newName = document.getElementById('new-part-name').value.trim();
-                if (!newName) { alert("Part Name is required!"); return; }
-                let maxId = 0;
-                if (inventory.length > 0) maxId = Math.max(...inventory.map(i => i.id));
-                partId = maxId + 1;
-                partName = newName;
-                inventory.push({
-                    id: partId,
-                    sapNumber: document.getElementById('sap-number').value.trim() || "NA",
-                    name: newName,
-                    description: document.getElementById('new-part-desc').value || "",
-                    stock: qtyIn - qtyOut,
-                    minStock: parseInt(document.getElementById('min-stock').value) || 20,
-                    maxStock: parseInt(document.getElementById('max-stock').value) || 500,
-                    lastUpdated: new Date().toISOString().slice(0,10)
-                });
-            } else {
-                partId = parseInt(selectValue);
-                const item = inventory.find(i => i.id === partId);
-                if (item) {
-                    item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
-                    item.lastUpdated = new Date().toISOString().slice(0,10);
-                    partName = item.name;
-                }
-            }
-            transactions.unshift({
-                date: new Date().toISOString().slice(0,10),
-                materialId: partId,
-                partName: partName || "Unknown",
-                qtyIn: qtyIn,
-                qtyOut: qtyOut,
-                reason: reason
-            });
-            alert("✅ Stock Updated Successfully!");
+            // ... rest of your logic
+
+            showToast("✅ Stock Updated Successfully!");
             closeModals();
             renderInventory();
             renderTransactions();
-            await syncToGoogle();
-        }
-
-        function editPart(id) {
-            const item = inventory.find(i => i.id === id);
-            if (!item) return;
-            document.getElementById('edit-id').value = item.id;
-            document.getElementById('edit-name').value = item.name;
-            document.getElementById('edit-desc').value = item.description;
-            document.getElementById('edit-stock').value = item.stock;
-            document.getElementById('edit-min').value = item.minStock;
-            document.getElementById('edit-max').value = item.maxStock;
-            document.getElementById('edit-qty-in').value = 0;
-            document.getElementById('edit-qty-out').value = 0;
-            document.getElementById('edit-reason').value = '';
-            document.getElementById('edit-modal').classList.remove('hidden');
+            await sendToGoogle("save", { inventory, transactions });   // better than syncToGoogle
         }
 
         async function saveEditedPart() {
-            const id = parseInt(document.getElementById('edit-id').value);
-            const item = inventory.find(i => i.id === id);
-            if (!item) return;
-            const qtyIn = parseInt(document.getElementById('edit-qty-in').value) || 0;
-            const qtyOut = parseInt(document.getElementById('edit-qty-out').value) || 0;
-            const reason = document.getElementById('edit-reason').value.trim() || "Stock Edit";
-            item.name = document.getElementById('edit-name').value;
-            item.description = document.getElementById('edit-desc').value;
-            item.minStock = parseInt(document.getElementById('edit-min').value) || 0;
-            item.maxStock = parseInt(document.getElementById('edit-max').value) || 999;
-            if (qtyIn > 0 || qtyOut > 0) {
-                item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
-                item.lastUpdated = new Date().toISOString().slice(0,10);
-                transactions.unshift({
-                    date: new Date().toISOString().slice(0,10),
-                    materialId: item.id,
-                    partName: item.name,
-                    qtyIn: qtyIn,
-                    qtyOut: qtyOut,
-                    reason: reason
-                });
-            }
-            alert("✅ Part Updated Successfully!");
+            // ... your existing code
+            showToast("✅ Part Updated Successfully!");
             closeModals();
             renderInventory();
             renderTransactions();
-            await syncToGoogle();
+            await sendToGoogle("save", { inventory, transactions });
         }
 
         async function deletePart(id) {
             if (confirm("Delete this Material?")) {
                 inventory = inventory.filter(i => i.id !== id);
                 renderInventory();
-                await syncToGoogle();
+                await sendToGoogle("save", { inventory, transactions });
+                showToast("Part deleted successfully");
             }
         }
+
+        // Keep the rest of your functions unchanged: exportCSV, handleCSVImport, openNewEntryModal, etc.
 
         function closeModals() {
             document.getElementById('new-modal').classList.add('hidden');
