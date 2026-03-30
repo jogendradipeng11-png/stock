@@ -29,10 +29,10 @@
         <div class="glass w-full max-w-md mx-4 rounded-3xl p-10 text-center">
             <h1 class="heading-font text-5xl mb-2">StoreVault</h1>
             <p class="text-cyan-400 mb-8">Inventory Management</p>
-            <input id="username" placeholder="Username" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-4 focus:outline-none focus:border-cyan-400">
-            <input id="password" type="password" placeholder="Password" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-6 focus:outline-none focus:border-cyan-400">
-            <button onclick="attemptLogin()" class="w-full h-12 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-3xl hover:scale-105 transition-all">LOGIN</button>
-            <p class="text-xs text-slate-400 mt-6">Demo: <strong>admin / 1234</strong></p>
+            <input id="username" placeholder="Username" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-4">
+            <input id="password" type="password" placeholder="Password" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-6">
+            <button onclick="attemptLogin()" class="w-full h-12 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-3xl">LOGIN</button>
+            <p class="text-xs text-slate-400 mt-6">Demo: admin / 1234</p>
         </div>
     </div>
 
@@ -123,7 +123,7 @@
     <div id="new-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
         <div class="glass w-full max-w-lg mx-4 rounded-3xl p-8">
             <h2 class="text-2xl font-semibold mb-6">New Stock Entry</h2>
-            <select id="part-select" onchange="handlePartSelection()" class="w-full p-4 bg-slate-900 rounded-2xl mb-6 text-white"></select>
+            <select id="part-select" onchange="handlePartSelection()" class="w-full p-4 bg-slate-900 rounded-2xl mb-6"></select>
             
             <div id="new-part-section" class="hidden space-y-4 mb-6">
                 <input id="new-part-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl">
@@ -201,13 +201,11 @@
     <input type="file" id="csv-import" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
 
     <script>
-        // ==================== CONFIGURATION ====================
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtMr_VnBgWVdQyrF4UFzpy8ov4m7K8qtnOtZ3uzfKuwUW56R3A93QgEcuO4zWGZKM/exec";
 
         let inventory = [];
         let transactions = [];
 
-        // ==================== TOAST NOTIFICATION ====================
         function showToast(msg, type = "success") {
             const toast = document.createElement("div");
             toast.className = `fixed bottom-6 right-6 px-6 py-4 rounded-2xl glass flex items-center gap-3 z-[99999] toast ${type === "error" ? "border border-red-500" : ""}`;
@@ -216,51 +214,54 @@
             setTimeout(() => toast.remove(), 4500);
         }
 
-        // ==================== GOOGLE APPS SCRIPT COMMUNICATION ====================
+        // Improved Google Fetch with redirect and cache busting
+        async function googleFetch(endpoint) {
+            try {
+                const url = `${WEB_APP_URL}${endpoint.includes('?') ? endpoint + '&t=' + Date.now() : endpoint + '?t=' + Date.now()}`;
+                const res = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    redirect: 'follow'
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return await res.json();
+            } catch (e) {
+                console.error("Google Fetch Error:", e);
+                return { success: false, message: e.message };
+            }
+        }
+
         async function sendToGoogle(action, payload) {
             try {
                 const res = await fetch(WEB_APP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: action, data: payload })
+                    body: JSON.stringify({ action, data: payload }),
+                    redirect: 'follow'
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return await res.json();
             } catch (e) {
-                console.error("Send Error:", e);
+                console.error("Save Error:", e);
                 return { success: false };
             }
         }
 
         async function loadFromGoogle() {
-            try {
-                // Cache busting to ensure fresh data from Google Sheets
-                const url = `${WEB_APP_URL}?action=get&t=${Date.now()}`;
-                const res = await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    inventory = data.inventory || [];
-                    transactions = data.transactions || [];
-                    console.log(`Loaded ${inventory.length} items from Google Sheets`);
-                    return true;
-                } else {
-                    console.error("Load failed:", data);
-                    return false;
-                }
-            } catch (e) {
-                console.error("Load Error:", e);
-                return false;
+            const result = await googleFetch("?action=get");
+            if (result.success) {
+                inventory = result.inventory || [];
+                transactions = result.transactions || [];
+                console.log(`✅ Loaded ${inventory.length} items`);
+                return true;
             }
+            console.error("Load failed:", result);
+            return false;
         }
 
-        // Save to Cloud
         async function manualSaveToGoogle() {
             const btn = document.getElementById('save-btn');
-            const originalHTML = btn.innerHTML;
+            const original = btn.innerHTML;
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Saving...`;
             btn.disabled = true;
 
@@ -272,28 +273,44 @@
                 showToast("❌ Save failed. Make sure Web App is deployed as 'Anyone'", "error");
             }
 
-            btn.innerHTML = originalHTML;
+            btn.innerHTML = original;
             btn.disabled = false;
         }
 
-        // ==================== RENDER FUNCTIONS ====================
+        async function attemptLogin() {
+            showToast("Loading data from Google Sheets...", "info");
+            const loaded = await loadFromGoogle();
+
+            document.getElementById('login-modal').style.display = 'none';
+            document.getElementById('main-app').classList.remove('hidden');
+
+            renderInventory();
+            renderTransactions();
+
+            if (!loaded) {
+                showToast("Failed to load data. Please redeploy Google Web App as 'Anyone'", "error");
+            } else if (inventory.length === 0) {
+                showToast("No data yet. Add items and click 'Save to Cloud'", "info");
+            }
+        }
+
+        // ==================== Other Functions ====================
         function renderInventory(filtered = null) {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = '';
             const data = filtered || inventory;
-
             data.forEach(item => {
-                const isLow = item.stock < item.minStock;
-                const isHigh = item.stock > item.maxStock;
+                const low = item.stock < (item.minStock || 0);
+                const high = item.stock > (item.maxStock || 999);
                 tbody.innerHTML += `
-                <tr class="${isLow ? 'low-stock' : isHigh ? 'high-stock' : ''}">
+                <tr class="${low ? 'low-stock' : high ? 'high-stock' : ''}">
                     <td class="px-8 py-5 font-mono">#${item.id}</td>
                     <td class="px-4 py-5">${item.sapNumber || '—'}</td>
                     <td class="px-4 py-5 font-semibold">${item.name}</td>
                     <td class="px-4 py-5 text-slate-400">${item.description || ''}</td>
                     <td class="px-4 py-5 text-center font-bold text-xl">${item.stock}</td>
-                    <td class="px-4 py-5 text-center">${item.minStock}</td>
-                    <td class="px-4 py-5 text-center">${item.maxStock}</td>
+                    <td class="px-4 py-5 text-center">${item.minStock || 20}</td>
+                    <td class="px-4 py-5 text-center">${item.maxStock || 500}</td>
                     <td class="px-8 py-5 text-right">
                         <button onclick="editPart(${item.id})" class="text-emerald-400 hover:text-white mr-4"><i class="fa-solid fa-pen"></i></button>
                         <button onclick="deletePart(${item.id})" class="text-rose-400 hover:text-white"><i class="fa-solid fa-trash"></i></button>
@@ -318,21 +335,6 @@
             });
         }
 
-        // ==================== LOGIN ====================
-        async function attemptLogin() {
-            showToast("Loading data from Google Sheets...", "info");
-            await loadFromGoogle();
-            document.getElementById('login-modal').style.display = 'none';
-            document.getElementById('main-app').classList.remove('hidden');
-            renderInventory();
-            renderTransactions();
-
-            if (inventory.length === 0) {
-                showToast("No data found. Add items and click 'Save to Cloud'", "info");
-            }
-        }
-
-        // ==================== NEW ENTRY ====================
         function openNewEntryModal() {
             const select = document.getElementById('part-select');
             select.innerHTML = `<option value="">— Select Part or Create New —</option>`;
@@ -393,9 +395,7 @@
                 date: new Date().toISOString().slice(0,10),
                 materialId: partId,
                 partName: partName || "Unknown",
-                qtyIn: qtyIn,
-                qtyOut: qtyOut,
-                reason: reason
+                qtyIn, qtyOut, reason
             });
 
             showToast("Stock updated successfully!");
@@ -405,7 +405,6 @@
             await sendToGoogle("save", { inventory, transactions });
         }
 
-        // ==================== EDIT & DELETE ====================
         function editPart(id) {
             const item = inventory.find(i => i.id === id);
             if (!item) return;
@@ -467,15 +466,14 @@
             document.getElementById('edit-modal').classList.add('hidden');
         }
 
-        // ==================== SEARCH & EXPORT/IMPORT ====================
         function filterTable() {
             const term = document.getElementById('search-input').value.toLowerCase().trim();
             if (!term) return renderInventory();
             const filtered = inventory.filter(item =>
-                item.name.toLowerCase().includes(term) ||
+                (item.name || "").toLowerCase().includes(term) ||
                 String(item.id).includes(term) ||
-                (item.sapNumber && item.sapNumber.toLowerCase().includes(term)) ||
-                (item.description && item.description.toLowerCase().includes(term))
+                (item.sapNumber || "").toLowerCase().includes(term) ||
+                (item.description || "").toLowerCase().includes(term)
             );
             renderInventory(filtered);
         }
@@ -483,7 +481,7 @@
         function exportCSV() {
             let csv = "Material No,SAP Number,Part Name,Description,Stock,Min,Max,Last Updated\n";
             inventory.forEach(i => {
-                csv += `#${i.id},"${i.sapNumber || ''}","${i.name}","${i.description || ''}",${i.stock},${i.minStock},${i.maxStock},${i.lastUpdated || ''}\n`;
+                csv += `#${i.id},"${i.sapNumber || ''}","${i.name}","${i.description || ''}",${i.stock},${i.minStock || 20},${i.maxStock || 500},${i.lastUpdated || ''}\n`;
             });
             downloadCSV(csv, `StoreVault_Inventory_${new Date().toISOString().slice(0,10)}.csv`);
         }
@@ -511,7 +509,6 @@
             const text = await file.text();
             const rows = text.trim().split('\n');
             let count = 0;
-
             for (let i = 1; i < rows.length; i++) {
                 const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                 if (!cols[2]) continue;
@@ -527,7 +524,6 @@
                 });
                 count++;
             }
-
             if (count > 0) {
                 showToast(`Imported ${count} items successfully!`);
                 renderInventory();
@@ -540,7 +536,7 @@
             document.getElementById('csv-import').click();
         }
 
-        // ==================== INITIALIZATION ====================
+        // Start the app
         window.onload = attemptLogin;
     </script>
 </body>
