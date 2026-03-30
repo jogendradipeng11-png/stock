@@ -216,36 +216,33 @@
 
         // Improved Google Fetch with redirect and cache busting
         async function googleFetch(endpoint) {
-            try {
-                const url = `${WEB_APP_URL}${endpoint.includes('?') ? endpoint + '&t=' + Date.now() : endpoint + '?t=' + Date.now()}`;
-                const res = await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    redirect: 'follow'
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return await res.json();
-            } catch (e) {
-                console.error("Google Fetch Error:", e);
-                return { success: false, message: e.message };
-            }
-        }
-
+    try {
+        const res = await fetch(WEB_APP_URL + endpoint);
+        return await res.json();
+    } catch (e) {
+        console.error("Fetch Error:", e);
+        return { success: false };
+    }
+}
         async function sendToGoogle(action, payload) {
-            try {
-                const res = await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action, data: payload }),
-                    redirect: 'follow'
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return await res.json();
-            } catch (e) {
-                console.error("Save Error:", e);
-                return { success: false };
-            }
-        }
+    try {
+        const res = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: action,
+                ...payload
+            })
+        });
+
+        return await res.json();
+    } catch (e) {
+        console.error("Save Error:", e);
+        return { success: false };
+    }
+}
 
         async function loadFromGoogle() {
             const result = await googleFetch("?action=get");
