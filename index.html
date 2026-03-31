@@ -1,540 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StoreVault • Inventory Management</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
-        body { font-family: 'Inter', system-ui, sans-serif; }
-        .heading-font { font-family: 'Space Grotesk', sans-serif; }
-        .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
-        .low-stock { background-color: #7f1d1d !important; color: #fca5a5; }
-        .high-stock { background-color: #1e3a8a !important; color: #93c5fd; }
-        .toast {
-            animation: slideIn 0.4s ease forwards;
-        }
-        @keyframes slideIn {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoreVault • Inventory Management</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+body { font-family: 'Inter', system-ui, sans-serif; }
+.heading-font { font-family: 'Space Grotesk', sans-serif; }
+.glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
+.low-stock { background:#7f1d1d!important;color:#fca5a5 }
+.high-stock{ background:#1e3a8a!important;color:#93c5fd }
+.toast { animation: slideIn .4s ease forwards }
+@keyframes slideIn{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+</style>
 </head>
+
 <body class="bg-slate-950 text-slate-200 min-h-screen">
 
-    <!-- Login Modal -->
-    <div id="login-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[10000]">
-        <div class="glass w-full max-w-md mx-4 rounded-3xl p-10 text-center">
-            <h1 class="heading-font text-5xl mb-2">StoreVault</h1>
-            <p class="text-cyan-400 mb-8">Inventory Management</p>
-            <input id="username" placeholder="Username" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-4">
-            <input id="password" type="password" placeholder="Password" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-6">
-            <button onclick="attemptLogin()" class="w-full h-12 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-3xl">LOGIN</button>
-            <p class="text-xs text-slate-400 mt-6">Demo: admin / 1234</p>
-        </div>
-    </div>
+<!-- LOGIN -->
+<div id="login-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[10000]">
+<div class="glass w-full max-w-md p-10 rounded-3xl text-center">
+<h1 class="heading-font text-5xl mb-2">StoreVault</h1>
+<p class="text-cyan-400 mb-8">Inventory Management</p>
+<input placeholder="Username" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-4">
+<input type="password" placeholder="Password" class="w-full px-6 py-4 bg-slate-900 rounded-2xl mb-6">
+<button onclick="attemptLogin()" class="w-full h-12 bg-gradient-to-r from-cyan-400 to-blue-500 text-black rounded-3xl font-bold">LOGIN</button>
+<p class="text-xs text-slate-400 mt-6">Demo: admin / 1234</p>
+</div>
+</div>
 
-    <!-- Main App -->
-    <div id="main-app" class="hidden">
-        <nav class="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
-            <div class="max-w-screen-2xl mx-auto px-8 py-5 flex items-center justify-between">
-                <div class="flex items-center gap-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center">
-                        <i class="fa-solid fa-boxes-stacked text-white text-2xl"></i>
-                    </div>
-                    <h1 class="heading-font text-3xl">StoreVault</h1>
-                </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="exportCSV()" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-5 h-10 rounded-3xl text-sm">
-                        <i class="fa-solid fa-download"></i> Export
-                    </button>
-                    <button onclick="exportTransactionsCSV()" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-5 h-10 rounded-3xl text-sm">
-                        <i class="fa-solid fa-download"></i> Transactions
-                    </button>
-                    <button onclick="importCSV()" class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 px-5 h-10 rounded-3xl text-sm">
-                        <i class="fa-solid fa-upload"></i> Import CSV
-                    </button>
-                    <button onclick="manualSaveToGoogle()" id="save-btn" 
-                            class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 h-10 rounded-3xl font-medium">
-                        <i class="fa-solid fa-cloud-upload-alt"></i> Save to Cloud
-                    </button>
-                    <button onclick="openNewEntryModal()" 
-                            class="bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-semibold px-6 h-11 rounded-3xl flex items-center gap-2 hover:scale-105 transition-all">
-                        <i class="fa-solid fa-plus"></i> NEW ENTRY
-                    </button>
-                </div>
-            </div>
-        </nav>
+<!-- MAIN APP -->
+<div id="main-app" class="hidden">
 
-        <div class="max-w-screen-2xl mx-auto px-8 py-8">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-5xl heading-font">Store Inventory</h2>
-                <input id="search-input" type="text" placeholder="Search by Material No, SAP No or Name..."
-                       class="w-96 px-6 py-3 bg-slate-900 border border-white/10 rounded-3xl focus:border-cyan-400 outline-none"
-                       onkeyup="filterTable()">
-            </div>
+<!-- NAV -->
+<nav class="bg-slate-900/80 border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
+<div class="max-w-screen-2xl mx-auto px-8 py-5 flex justify-between items-center">
+<div class="flex gap-3 items-center">
+<div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex justify-center items-center">
+<i class="fa-solid fa-boxes-stacked text-white"></i>
+</div>
+<h1 class="heading-font text-3xl">StoreVault</h1>
+</div>
 
-            <!-- Inventory Table -->
-            <div class="glass rounded-3xl overflow-hidden mb-12">
-                <table class="w-full">
-                    <thead class="bg-slate-900">
-                        <tr class="text-xs uppercase tracking-widest">
-                            <th class="px-8 py-5 text-left">Material No</th>
-                            <th class="px-4 py-5 text-left">SAP Number</th>
-                            <th class="px-4 py-5 text-left">Part Name</th>
-                            <th class="px-4 py-5 text-left">Description</th>
-                            <th class="px-4 py-5 text-center">Stock</th>
-                            <th class="px-4 py-5 text-center">Min</th>
-                            <th class="px-4 py-5 text-center">Max</th>
-                            <th class="px-8 py-5 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inventory-table-body" class="text-sm"></tbody>
-                </table>
-            </div>
+<div class="flex gap-3 items-center text-sm">
+<button onclick="exportCSV()" class="bg-slate-700 px-5 h-10 rounded-3xl">Export</button>
+<button onclick="exportTransactionsCSV()" class="bg-slate-700 px-5 h-10 rounded-3xl">Transactions</button>
+<button onclick="importCSV()" class="bg-amber-600 px-5 h-10 rounded-3xl">Import CSV</button>
+<button id="save-btn" onclick="manualSaveToGoogle()" class="bg-emerald-600 px-6 h-10 rounded-3xl">Save to Cloud</button>
+<button onclick="openNewEntryModal()" class="bg-gradient-to-r from-cyan-400 to-blue-500 text-black px-6 h-11 rounded-3xl font-semibold">NEW ENTRY</button>
+</div>
+</div>
+</nav>
 
-            <!-- Transaction History -->
-            <div class="glass rounded-3xl overflow-hidden">
-                <div class="px-8 py-5 border-b border-white/10 bg-slate-900/50">
-                    <h3 class="font-semibold text-lg">Stock Transaction History (Last 20)</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-slate-900">
-                            <tr class="text-xs uppercase tracking-widest">
-                                <th class="px-8 py-5 text-left">Date</th>
-                                <th class="px-4 py-5 text-left">Material No</th>
-                                <th class="px-4 py-5 text-left">Part Name</th>
-                                <th class="px-4 py-5 text-center">IN</th>
-                                <th class="px-4 py-5 text-center">OUT</th>
-                                <th class="px-4 py-5 text-left">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody id="transactions-table-body" class="text-sm"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="max-w-screen-2xl mx-auto px-8 py-8">
 
-    <!-- New Entry Modal -->
-    <div id="new-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
-        <div class="glass w-full max-w-lg mx-4 rounded-3xl p-8">
-            <h2 class="text-2xl font-semibold mb-6">New Stock Entry</h2>
-            <select id="part-select" onchange="handlePartSelection()" class="w-full p-4 bg-slate-900 rounded-2xl mb-6"></select>
-            
-            <div id="new-part-section" class="hidden space-y-4 mb-6">
-                <input id="new-part-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl">
-                <input id="sap-number" placeholder="SAP Number (Optional)" class="w-full p-4 bg-slate-900 rounded-2xl">
-                <textarea id="new-part-desc" placeholder="Description" class="w-full p-4 bg-slate-900 rounded-2xl h-24"></textarea>
-                <div class="grid grid-cols-2 gap-4">
-                    <input id="min-stock" type="number" placeholder="Min Stock" value="20" class="p-4 bg-slate-900 rounded-2xl">
-                    <input id="max-stock" type="number" placeholder="Max Stock" value="500" class="p-4 bg-slate-900 rounded-2xl">
-                </div>
-            </div>
+<div class="flex justify-between items-center mb-8">
+<h2 class="text-5xl heading-font">Store Inventory</h2>
+<input id="search-input" onkeyup="filterTable()" placeholder="Search..."
+class="w-96 px-6 py-3 bg-slate-900 border border-white/10 rounded-3xl outline-none">
+</div>
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="text-xs text-emerald-400 block mb-1">QUANTITY IN</label>
-                    <input id="qty-in" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl text-2xl">
-                </div>
-                <div>
-                    <label class="text-xs text-rose-400 block mb-1">QUANTITY OUT</label>
-                    <input id="qty-out" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl text-2xl">
-                </div>
-            </div>
+<div class="glass rounded-3xl overflow-hidden mb-12">
+<table class="w-full">
+<thead class="bg-slate-900 text-xs uppercase">
+<tr>
+<th class="px-8 py-5 text-left">Material</th>
+<th class="px-4 py-5 text-left">SAP</th>
+<th class="px-4 py-5 text-left">Name</th>
+<th class="px-4 py-5 text-left">Description</th>
+<th class="px-4 py-5 text-center">Stock</th>
+<th class="px-4 py-5 text-center">Min</th>
+<th class="px-4 py-5 text-center">Max</th>
+<th class="px-8 py-5 text-right">Actions</th>
+</tr>
+</thead>
+<tbody id="inventory-table-body"></tbody>
+</table>
+</div>
 
-            <input id="reason-input" placeholder="Reason (Restock, Sale, Damage, etc.)" class="w-full p-4 bg-slate-900 rounded-2xl mb-6">
+<div class="glass rounded-3xl overflow-hidden">
+<div class="px-8 py-5 bg-slate-900/50 border-b border-white/10">Recent Transactions</div>
+<table class="w-full">
+<thead class="bg-slate-900 text-xs uppercase">
+<tr>
+<th class="px-8 py-5 text-left">Date</th>
+<th class="px-4 py-5">Material</th>
+<th class="px-4 py-5">Part</th>
+<th class="px-4 py-5 text-center">IN</th>
+<th class="px-4 py-5 text-center">OUT</th>
+<th class="px-4 py-5">Reason</th>
+</tr>
+</thead>
+<tbody id="transactions-table-body"></tbody>
+</table>
+</div>
 
-            <div class="flex justify-end gap-4">
-                <button onclick="closeModals()" class="px-6 py-3 text-slate-400 hover:text-white">Cancel</button>
-                <button onclick="submitNewEntry()" class="bg-cyan-400 text-black px-8 py-3 rounded-3xl font-semibold">SAVE & UPDATE</button>
-            </div>
-        </div>
-    </div>
+</div>
+</div>
 
-    <!-- Edit Modal -->
-    <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xl z-[9999] flex items-center justify-center">
-        <div class="glass w-full max-w-lg mx-4 rounded-3xl p-8">
-            <h2 class="text-2xl font-semibold mb-6">Edit Part</h2>
-            <input id="edit-id" type="hidden">
-            <input id="edit-name" placeholder="Part Name" class="w-full p-4 bg-slate-900 rounded-2xl mb-4">
-            <textarea id="edit-desc" placeholder="Description" class="w-full p-4 bg-slate-900 rounded-2xl h-24 mb-4"></textarea>
-            
-            <div class="grid grid-cols-3 gap-4 mb-6">
-                <div>
-                    <label class="text-xs text-slate-400">Current Stock</label>
-                    <input id="edit-stock" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
-                </div>
-                <div>
-                    <label class="text-xs text-emerald-400">IN</label>
-                    <input id="edit-qty-in" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl">
-                </div>
-                <div>
-                    <label class="text-xs text-rose-400">OUT</label>
-                    <input id="edit-qty-out" type="number" value="0" class="w-full p-4 bg-slate-900 rounded-2xl">
-                </div>
-            </div>
-            
-            <input id="edit-reason" placeholder="Reason for adjustment" class="w-full p-4 bg-slate-900 rounded-2xl mb-6">
+<input type="file" id="csv-import" accept=".csv" hidden onchange="handleCSVImport(event)">
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="text-xs text-slate-400">Min Stock</label>
-                    <input id="edit-min" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400">Max Stock</label>
-                    <input id="edit-max" type="number" class="w-full p-4 bg-slate-900 rounded-2xl">
-                </div>
-            </div>
+<script>
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyMq42ZRu_lW5cJZZD15jKvM8RBeZ4939lS-7jYcB8N1Rp0YvafVrCw2j7OGvfTHRI/exec";
 
-            <div class="flex justify-end gap-4">
-                <button onclick="closeModals()" class="px-6 py-3 text-slate-400 hover:text-white">Cancel</button>
-                <button onclick="saveEditedPart()" class="bg-emerald-400 text-black px-8 py-3 rounded-3xl font-semibold">UPDATE PART</button>
-            </div>
-        </div>
-    </div>
+let inventory = [];
+let transactions = [];
 
-    <input type="file" id="csv-import" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
+function toast(msg){const t=document.createElement("div");t.className="toast fixed bottom-5 right-5 glass px-6 py-4 rounded-2xl";t.innerHTML="✅ "+msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
 
-    <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtMr_VnBgWVdQyrF4UFzpy8ov4m7K8qtnOtZ3uzfKuwUW56R3A93QgEcuO4zWGZKM/exec";
-
-        let inventory = [];
-        let transactions = [];
-
-        function showToast(msg, type = "success") {
-            const toast = document.createElement("div");
-            toast.className = `fixed bottom-6 right-6 px-6 py-4 rounded-2xl glass flex items-center gap-3 z-[99999] toast ${type === "error" ? "border border-red-500" : ""}`;
-            toast.innerHTML = `${type === "success" ? "✅" : "❌"} ${msg}`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4500);
-        }
-
-        // Improved Google Fetch with redirect and cache busting
-        async function googleFetch(endpoint) {
-    try {
-        const res = await fetch(WEB_APP_URL + endpoint);
-        return await res.json();
-    } catch (e) {
-        console.error("Fetch Error:", e);
-        return { success: false };
-    }
-}
-        async function sendToGoogle(action, payload) {
-    try {
-        const res = await fetch(WEB_APP_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: action,
-                ...payload
-            })
-        });
-
-        return await res.json();
-    } catch (e) {
-        console.error("Save Error:", e);
-        return { success: false };
-    }
+async function googleFetch(q){const r=await fetch(WEB_APP_URL+q);return await r.json();}
+async function sendToGoogle(action,payload){
+return fetch(WEB_APP_URL,{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({action,data:payload})
+}).then(r=>r.json());
 }
 
-        async function loadFromGoogle() {
-            const result = await googleFetch("?action=get");
-            if (result.success) {
-                inventory = result.inventory || [];
-                transactions = result.transactions || [];
-                console.log(`✅ Loaded ${inventory.length} items`);
-                return true;
-            }
-            console.error("Load failed:", result);
-            return false;
-        }
+async function loadFromGoogle(){
+const r=await googleFetch("?action=get");
+if(r.success){inventory=r.inventory||[];transactions=r.transactions||[];}
+}
 
-        async function manualSaveToGoogle() {
-            const btn = document.getElementById('save-btn');
-            const original = btn.innerHTML;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Saving...`;
-            btn.disabled = true;
+async function manualSaveToGoogle(){
+await sendToGoogle("save",{inventory,transactions});
+toast("Saved to Google Sheets");
+}
 
-            const result = await sendToGoogle("save", { inventory, transactions });
+async function attemptLogin(){
+await loadFromGoogle();
+document.getElementById("login-modal").style.display="none";
+document.getElementById("main-app").classList.remove("hidden");
+renderInventory();renderTransactions();
+}
 
-            if (result.success) {
-                showToast("✅ Successfully saved to Google Sheets!");
-            } else {
-                showToast("❌ Save failed. Make sure Web App is deployed as 'Anyone'", "error");
-            }
+function renderInventory(){
+const b=document.getElementById("inventory-table-body");b.innerHTML="";
+inventory.forEach(i=>{
+b.innerHTML+=`
+<tr class="${i.stock<i.minStock?'low-stock':i.stock>i.maxStock?'high-stock':''}">
+<td class="px-8 py-5">#${i.id}</td>
+<td class="px-4 py-5">${i.sapNumber||''}</td>
+<td class="px-4 py-5 font-semibold">${i.name}</td>
+<td class="px-4 py-5 text-slate-400">${i.description||''}</td>
+<td class="px-4 py-5 text-center font-bold">${i.stock}</td>
+<td class="px-4 py-5 text-center">${i.minStock}</td>
+<td class="px-4 py-5 text-center">${i.maxStock}</td>
+<td class="px-8 py-5 text-right">
+<button onclick="editPart(${i.id})" class="text-emerald-400 mr-3">✏</button>
+<button onclick="deletePart(${i.id})" class="text-rose-400">🗑</button>
+</td></tr>`;
+});
+}
 
-            btn.innerHTML = original;
-            btn.disabled = false;
-        }
+function renderTransactions(){
+const b=document.getElementById("transactions-table-body");b.innerHTML="";
+transactions.slice(0,20).forEach(t=>{
+b.innerHTML+=`
+<tr>
+<td class="px-8 py-5">${t.date}</td>
+<td class="px-4 py-5">#${t.materialId}</td>
+<td class="px-4 py-5">${t.partName}</td>
+<td class="px-4 py-5 text-center text-emerald-400">${t.qtyIn?`+${t.qtyIn}`:"—"}</td>
+<td class="px-4 py-5 text-center text-rose-400">${t.qtyOut?`-${t.qtyOut}`:"—"}</td>
+<td class="px-4 py-5 text-slate-400">${t.reason}</td>
+</tr>`;
+});
+}
 
-        async function attemptLogin() {
-            showToast("Loading data from Google Sheets...", "info");
-            const loaded = await loadFromGoogle();
+function importCSV(){document.getElementById("csv-import").click();}
+function exportCSV(){}
+function exportTransactionsCSV(){}
+function filterTable(){}
+function openNewEntryModal(){}
+function closeModals(){}
+function editPart(){}
+function deletePart(){}
+function handleCSVImport(){}
 
-            document.getElementById('login-modal').style.display = 'none';
-            document.getElementById('main-app').classList.remove('hidden');
-
-            renderInventory();
-            renderTransactions();
-
-            if (!loaded) {
-                showToast("Failed to load data. Please redeploy Google Web App as 'Anyone'", "error");
-            } else if (inventory.length === 0) {
-                showToast("No data yet. Add items and click 'Save to Cloud'", "info");
-            }
-        }
-
-        // ==================== Other Functions ====================
-        function renderInventory(filtered = null) {
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = '';
-            const data = filtered || inventory;
-            data.forEach(item => {
-                const low = item.stock < (item.minStock || 0);
-                const high = item.stock > (item.maxStock || 999);
-                tbody.innerHTML += `
-                <tr class="${low ? 'low-stock' : high ? 'high-stock' : ''}">
-                    <td class="px-8 py-5 font-mono">#${item.id}</td>
-                    <td class="px-4 py-5">${item.sapNumber || '—'}</td>
-                    <td class="px-4 py-5 font-semibold">${item.name}</td>
-                    <td class="px-4 py-5 text-slate-400">${item.description || ''}</td>
-                    <td class="px-4 py-5 text-center font-bold text-xl">${item.stock}</td>
-                    <td class="px-4 py-5 text-center">${item.minStock || 20}</td>
-                    <td class="px-4 py-5 text-center">${item.maxStock || 500}</td>
-                    <td class="px-8 py-5 text-right">
-                        <button onclick="editPart(${item.id})" class="text-emerald-400 hover:text-white mr-4"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="deletePart(${item.id})" class="text-rose-400 hover:text-white"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                </tr>`;
-            });
-        }
-
-        function renderTransactions() {
-            const tbody = document.getElementById('transactions-table-body');
-            tbody.innerHTML = '';
-            transactions.slice(0, 20).forEach(t => {
-                tbody.innerHTML += `
-                <tr>
-                    <td class="px-8 py-5">${t.date}</td>
-                    <td class="px-4 py-5 font-mono">#${t.materialId}</td>
-                    <td class="px-4 py-5">${t.partName}</td>
-                    <td class="px-4 py-5 text-center text-emerald-400">${t.qtyIn ? '+' + t.qtyIn : '—'}</td>
-                    <td class="px-4 py-5 text-center text-rose-400">${t.qtyOut ? '-' + t.qtyOut : '—'}</td>
-                    <td class="px-4 py-5 text-slate-400">${t.reason}</td>
-                </tr>`;
-            });
-        }
-
-        function openNewEntryModal() {
-            const select = document.getElementById('part-select');
-            select.innerHTML = `<option value="">— Select Part or Create New —</option>`;
-            inventory.forEach(i => select.innerHTML += `<option value="${i.id}">${i.name}</option>`);
-            select.innerHTML += `<option value="new">+ Create New Part</option>`;
-            document.getElementById('new-part-section').classList.add('hidden');
-            document.getElementById('qty-in').value = 0;
-            document.getElementById('qty-out').value = 0;
-            document.getElementById('reason-input').value = '';
-            document.getElementById('new-modal').classList.remove('hidden');
-        }
-
-        function handlePartSelection() {
-            const val = document.getElementById('part-select').value;
-            document.getElementById('new-part-section').classList.toggle('hidden', val !== "new");
-        }
-
-        async function submitNewEntry() {
-            const selectValue = document.getElementById('part-select').value;
-            const qtyIn = parseInt(document.getElementById('qty-in').value) || 0;
-            const qtyOut = parseInt(document.getElementById('qty-out').value) || 0;
-            const reason = document.getElementById('reason-input').value.trim() || "Stock Update";
-
-            if (qtyIn === 0 && qtyOut === 0) {
-                showToast("Please enter Quantity IN or OUT", "error");
-                return;
-            }
-
-            let partId, partName;
-            if (selectValue === "new") {
-                const newName = document.getElementById('new-part-name').value.trim();
-                if (!newName) return showToast("Part Name is required", "error");
-
-                partId = inventory.length ? Math.max(...inventory.map(i => i.id)) + 1 : 1;
-                partName = newName;
-
-                inventory.push({
-                    id: partId,
-                    sapNumber: document.getElementById('sap-number').value.trim() || "NA",
-                    name: newName,
-                    description: document.getElementById('new-part-desc').value.trim(),
-                    stock: qtyIn - qtyOut,
-                    minStock: parseInt(document.getElementById('min-stock').value) || 20,
-                    maxStock: parseInt(document.getElementById('max-stock').value) || 500,
-                    lastUpdated: new Date().toISOString().slice(0,10)
-                });
-            } else {
-                partId = parseInt(selectValue);
-                const item = inventory.find(i => i.id === partId);
-                if (item) {
-                    item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
-                    item.lastUpdated = new Date().toISOString().slice(0,10);
-                    partName = item.name;
-                }
-            }
-
-            transactions.unshift({
-                date: new Date().toISOString().slice(0,10),
-                materialId: partId,
-                partName: partName || "Unknown",
-                qtyIn, qtyOut, reason
-            });
-
-            showToast("Stock updated successfully!");
-            closeModals();
-            renderInventory();
-            renderTransactions();
-            await sendToGoogle("save", { inventory, transactions });
-        }
-
-        function editPart(id) {
-            const item = inventory.find(i => i.id === id);
-            if (!item) return;
-            document.getElementById('edit-id').value = item.id;
-            document.getElementById('edit-name').value = item.name;
-            document.getElementById('edit-desc').value = item.description || '';
-            document.getElementById('edit-stock').value = item.stock;
-            document.getElementById('edit-min').value = item.minStock;
-            document.getElementById('edit-max').value = item.maxStock;
-            document.getElementById('edit-qty-in').value = 0;
-            document.getElementById('edit-qty-out').value = 0;
-            document.getElementById('edit-reason').value = '';
-            document.getElementById('edit-modal').classList.remove('hidden');
-        }
-
-        async function saveEditedPart() {
-            const id = parseInt(document.getElementById('edit-id').value);
-            const item = inventory.find(i => i.id === id);
-            if (!item) return;
-
-            const qtyIn = parseInt(document.getElementById('edit-qty-in').value) || 0;
-            const qtyOut = parseInt(document.getElementById('edit-qty-out').value) || 0;
-            const reason = document.getElementById('edit-reason').value.trim() || "Edited";
-
-            item.name = document.getElementById('edit-name').value;
-            item.description = document.getElementById('edit-desc').value;
-            item.minStock = parseInt(document.getElementById('edit-min').value) || 0;
-            item.maxStock = parseInt(document.getElementById('edit-max').value) || 999;
-
-            if (qtyIn > 0 || qtyOut > 0) {
-                item.stock = Math.max(0, item.stock + qtyIn - qtyOut);
-                item.lastUpdated = new Date().toISOString().slice(0,10);
-                transactions.unshift({
-                    date: new Date().toISOString().slice(0,10),
-                    materialId: item.id,
-                    partName: item.name,
-                    qtyIn, qtyOut, reason
-                });
-            }
-
-            showToast("Part updated successfully!");
-            closeModals();
-            renderInventory();
-            renderTransactions();
-            await sendToGoogle("save", { inventory, transactions });
-        }
-
-        function deletePart(id) {
-            if (confirm("Delete this part permanently?")) {
-                inventory = inventory.filter(i => i.id !== id);
-                renderInventory();
-                sendToGoogle("save", { inventory, transactions });
-                showToast("Part deleted successfully");
-            }
-        }
-
-        function closeModals() {
-            document.getElementById('new-modal').classList.add('hidden');
-            document.getElementById('edit-modal').classList.add('hidden');
-        }
-
-        function filterTable() {
-            const term = document.getElementById('search-input').value.toLowerCase().trim();
-            if (!term) return renderInventory();
-            const filtered = inventory.filter(item =>
-                (item.name || "").toLowerCase().includes(term) ||
-                String(item.id).includes(term) ||
-                (item.sapNumber || "").toLowerCase().includes(term) ||
-                (item.description || "").toLowerCase().includes(term)
-            );
-            renderInventory(filtered);
-        }
-
-        function exportCSV() {
-            let csv = "Material No,SAP Number,Part Name,Description,Stock,Min,Max,Last Updated\n";
-            inventory.forEach(i => {
-                csv += `#${i.id},"${i.sapNumber || ''}","${i.name}","${i.description || ''}",${i.stock},${i.minStock || 20},${i.maxStock || 500},${i.lastUpdated || ''}\n`;
-            });
-            downloadCSV(csv, `StoreVault_Inventory_${new Date().toISOString().slice(0,10)}.csv`);
-        }
-
-        function exportTransactionsCSV() {
-            let csv = "Date,Material No,Part Name,IN,OUT,Reason\n";
-            transactions.forEach(t => {
-                csv += `"${t.date}",#${t.materialId},"${t.partName}",${t.qtyIn || 0},${t.qtyOut || 0},"${t.reason}"\n`;
-            });
-            downloadCSV(csv, `StoreVault_Transactions_${new Date().toISOString().slice(0,10)}.csv`);
-        }
-
-        function downloadCSV(content, filename) {
-            const blob = new Blob([content], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-        }
-
-        async function handleCSVImport(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const text = await file.text();
-            const rows = text.trim().split('\n');
-            let count = 0;
-            for (let i = 1; i < rows.length; i++) {
-                const cols = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                if (!cols[2]) continue;
-                inventory.push({
-                    id: Date.now() + count,
-                    sapNumber: cols[1] ? cols[1].replace(/"/g,'').trim() : "NA",
-                    name: cols[2].replace(/"/g,'').trim(),
-                    description: cols[3] ? cols[3].replace(/"/g,'').trim() : "",
-                    stock: parseInt(cols[4]) || 0,
-                    minStock: parseInt(cols[5]) || 20,
-                    maxStock: parseInt(cols[6]) || 500,
-                    lastUpdated: new Date().toISOString().slice(0,10)
-                });
-                count++;
-            }
-            if (count > 0) {
-                showToast(`Imported ${count} items successfully!`);
-                renderInventory();
-                await sendToGoogle("save", { inventory, transactions });
-            }
-            e.target.value = '';
-        }
-
-        function importCSV() {
-            document.getElementById('csv-import').click();
-        }
-
-        // Start the app
-        window.onload = attemptLogin;
-    </script>
+window.onload = attemptLogin;
+</script>
 </body>
 </html>
